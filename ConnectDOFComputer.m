@@ -5,8 +5,8 @@ classdef ConnectDOFComputer < handle
     end
 
     properties (Access = private)
-        dim
-        Tn
+        dimensions
+        nodalConnectivities
     end
 
     methods (Access = public)
@@ -24,16 +24,20 @@ classdef ConnectDOFComputer < handle
     methods  (Access = private)
 
         function init(obj,cParams)
-            obj.dim = cParams.dim;
-            obj.Tn = cParams.Tn;
+            obj.dimensions          = cParams.dim;
+            obj.nodalConnectivities = cParams.Tn;
         end
 
         function computeConnectMatrix(obj)
-            obj.Td=zeros(obj.dim.nel,obj.dim.ni*obj.dim.nne);
-            for nElement=1:obj.dim.nel
-                for nNode=1:obj.dim.nne
-                    for nDegree=1:obj.dim.ni
-                        obj.Td(nElement, obj.dim.ni*(nNode-1)+nDegree) = ...
+            dim = obj.dimensions;
+           
+            obj.Td=zeros(dim.nel, dim.ni*dim.nne);
+
+            for nElement=1:dim.nel
+                for nNode=1:dim.nne
+                    for nDegree=1:dim.ni
+                        
+                        obj.Td(nElement, dim.ni*(nNode-1)+nDegree) = ...
                         computeNod2Dof(obj, nElement, nNode, nDegree);
                     end
                 end
@@ -41,7 +45,10 @@ classdef ConnectDOFComputer < handle
         end
 
         function s = computeNod2Dof(obj, nElement, nNode, nDegree)
-            s = obj.dim.ni*obj.Tn(nElement,nNode) - obj.dim.ni + nDegree;
+            dim = obj.dimensions;
+            Tn = obj.nodalConnectivities;
+
+            s = dim.ni*Tn(nElement,nNode) - dim.ni + nDegree;
         end
         
     end

@@ -5,9 +5,14 @@ classdef GlobalExternalForceComputer < handle
     end
 
     properties (Access = private)
-        dim
-        Td
-        fel 
+        dimensions
+        xDist
+        nodalConnectivities
+        lift 
+        weight
+        xaDist
+        xcDist
+        xmDist
         fdata
     end
 
@@ -26,28 +31,69 @@ classdef GlobalExternalForceComputer < handle
     methods (Access = private)
 
         function init(obj,cParams)
-            obj.dim = cParams.dim;
-            obj.Td = cParams.Td;
-            obj.fel = cParams.fel;
-            obj.fdata = cParams.fdata;
+            obj.dimensions          = cParams.dim;
+            obj.fdata               = cParams.fdata;
+            obj.nodalConnectivities = cParams.Tn;
+            obj.xaDist              = cParams.xa;
+            obj.xcDist              = cParams.xc;
+            obj.xmDist              = cParams.xm;
+            obj.lift                = cParams.liftForceDist;
+            obj.weight              = cParams.weightForceDist;
+            obj.xDist               = cParams.x;
         end
 
         function computeExternalForce(obj)
-            obj.Fext = zeros(obj.dim.ndof,1);
-            for e = 1:obj.dim.nel
-                for i = 1:obj.dim.nne*obj.dim.ni
-                    I = obj.Td(e,i);
-                    obj.Fext(I) = obj.Fext(I) + obj.fel(i,e);
+            
+            connectMatrix = computeConnectMatrix(obj);
+            Td = connectMatrix.Td;
+
+            elementalForce = computeElementalForce(obj);
+            fel = elementalForce.fel;
+
+            dim = obj.dimensions;
+            fd  = obj.fdata;
+
+            obj.Fext = zeros(dim.ndof,1);
+
+            for e = 1:dim.nel
+                for i = 1:dim.nne*dim.ni
+                    I = Td(e,i);
+                    obj.Fext(I) = obj.Fext(I) + fel(i,e);
                 end
             end
-            for i = 1:size(obj.fdata,1)
+            for i = 1:size(fd,1)
                 I = computeNod2Dof(obj,i);
-                obj.Fext(I) = obj.Fext(I) + obj.fdata(i,3);
+                obj.Fext(I) = obj.Fext(I) + fd(i,3);
             end
         end
 
         function s = computeNod2Dof(obj,i)
-            s = obj.dim.ni*obj.fdata(i,1) - obj.dim.ni + obj.fdata(i,2);
+            dim = obj.dimensions;
+            fd  = obj.fdata;
+
+            s = dim.ni*fd(i,1) - dim.ni + fd(i,2);
+        end
+
+        function connectMatrix = computeConnectMatrix(obj)
+              s.dim = obj.dimensions;
+              s.Tn  = obj.nodalConnectivities;
+
+              connectMatrix = ConnectDOFComputer(s);
+              connectMatrix.compute();
+        end
+
+        function elementalForce = computeElementalForce(obj)
+            s.dim             = obj.dimensions;
+            s.x               = obj.xDist;
+            s.Tn              = obj.nodalConnectivities;
+            s.xa              = obj.xaDist;
+            s.xc              = obj.xcDist;
+            s.xm              = obj.xmDist;
+            s.liftForceDist   = obj.lift;
+            s.weightForceDist = obj.weight;
+
+            elementalForce = ElementalForceComputer(s);
+            elementalForce.compute();
         end
 
     end

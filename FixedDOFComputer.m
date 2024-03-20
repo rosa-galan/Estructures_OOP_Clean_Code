@@ -7,9 +7,8 @@ classdef FixedDOFComputer < handle
     end
 
     properties (Access = private)
-        dim
+        dimensions
         fixNodes
-        allDOF
     end
 
     methods (Access = public)
@@ -27,25 +26,32 @@ classdef FixedDOFComputer < handle
     methods (Access = private)
 
         function init(obj,cParams)
-            obj.dim = cParams.dim;
+            obj.dimensions = cParams.dim;
             obj.fixNodes = cParams.fixNodes;
-            obj.allDOF = 1:obj.dim.ndof;
         end
 
         function computeFixedDOF(obj)
-            obj.vr = zeros(1,size(obj.fixNodes,1));
-            obj.ur = zeros(1,size(obj.fixNodes,1)); 
-            for i=1:(size(obj.fixNodes, 1))
-                fnd = obj.fixNodes(i,:);
+            
+            dim = obj.dimensions;
+            DOF = 1:dim.ndof;
+            fN = obj.fixNodes;
+            
+            obj.vr = zeros(1,size(fN, 1));
+            obj.ur = zeros(1,size(fN, 1)); 
+
+            for i=1:(size(fN, 1))
+                fnd = fN(i,:);
                 I = computeNod2Dof(obj, fnd);
                 obj.vr(i) = I;
                 obj.ur(i) = fnd(3);
             end
-            obj.vf = setdiff(obj.allDOF, obj.vr);
+            obj.vf = setdiff(DOF, obj.vr);
         end
 
         function s = computeNod2Dof(obj,fnd)
-            s = obj.dim.ni*fnd(1) - obj.dim.ni + fnd(2);
+            dim = obj.dimensions;
+
+            s = dim.ni*fnd(1) - dim.ni + fnd(2);
         end 
 
     end

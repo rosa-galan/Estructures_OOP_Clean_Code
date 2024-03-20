@@ -9,14 +9,11 @@ classdef LiftWeightComputer < handle
     end
 
     properties (Access = private)
-        rho
-        V
-        Cl
-        lambda
-        g
-        b
-        c
-        Me
+        density
+        volume
+        liftCoefficient
+        span
+        chord
     end
 
     methods (Access = public)
@@ -37,24 +34,28 @@ classdef LiftWeightComputer < handle
     methods (Access = private)
 
         function init(obj,cParams)
-            obj.rho = cParams.rho;
-            obj.V = cParams.V;
-            obj.Cl = cParams.Cl;
-            obj.lambda = cParams.lambda;
-            obj.g = cParams.g;
-            obj.b = cParams.b;
-            obj.c = cParams.c;
-            obj.Me = cParams.Me;
+            obj.density         = cParams.rho;
+            obj.volume          = cParams.V;
+            obj.liftCoefficient = cParams.Cl;
+            obj.span            = cParams.b;
+            obj.chord           = cParams.c;
             obj.weightForceDist = cParams.lambda * cParams.g;
         end
          
         function computeLiftDistribution(obj)
             syms y;
-            obj.liftForceDist = 0.5 * obj.rho * obj.V^2 * (obj.c/1000) * obj.Cl * sqrt(1 - (y / (obj.b/1000))^2);
+            rho = obj.density;
+            V   = obj.volume;
+            c   = obj.chord;
+            Cl  = obj.liftCoefficient;
+            b   = obj.span;
+
+            obj.liftForceDist = 0.5 * rho * V^2 * (c/1000) * Cl * sqrt(1 - (y / (b/1000))^2);
         end
 
         function computeLiftForce(obj)
-            obj.liftIntegral = int(obj.liftForceDist, [0 obj.b/1000]);           
+            b = obj.span;
+            obj.liftIntegral = int(obj.liftForceDist, [0 b/1000]);           
         end
 
         function computeLiftMoment(obj)

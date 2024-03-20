@@ -1,23 +1,18 @@
 classdef InertiaComputer < handle
 
     properties (Access = public)
-        Ixx 
         IxxT 
-        Izz
         IzzT 
         J 
     end
 
     properties (Access = private)
-        t1
-        t2
-        t3
-        h1
-        h2
-        a
-        d
-        xc
-        xs
+        thickness
+        height
+        width
+        airfolDist
+        xcDist
+        xsDist
     end
 
     methods (Access = public)
@@ -35,27 +30,67 @@ classdef InertiaComputer < handle
     methods (Access = private)
 
         function init(obj,cParams)
-            obj.t1 = cParams.t1;
-            obj.t2 = cParams.t2;
-            obj.t3 = cParams.t3;
-            obj.h1 = cParams.h1;
-            obj.h2 = cParams.h2;
-            obj.a = cParams.a;
-            obj.d = cParams.d;
-            obj.xc = cParams.xc;
-            obj.xs = cParams.xs;
+            obj.thickness(1) = cParams.t1;
+            obj.thickness(2) = cParams.t2;
+            obj.thickness(3) = cParams.t3;
+            obj.height(1)    = cParams.h1;
+            obj.height(2)    = cParams.h2;
+            obj.width        = cParams.a;
+            obj.airfolDist   = cParams.d;
+            obj.xcDist       = cParams.xc;
+            obj.xsDist       = cParams.xs;
         end
 
         function computeInertia(obj)
-            obj.Ixx(1) = (obj.t1*obj.h1^3)/12;
-            obj.Ixx(2) = (obj.t2*obj.h2^3)/12;
-            obj.Ixx(3) = obj.a^3*sind(4.76)^2*obj.t3/12 + (obj.h2/2+obj.d/2*tand(4.76))^2*obj.t3*obj.a;
-            obj.IxxT = obj.Ixx(1)+obj.Ixx(2)+2*obj.Ixx(3);
-            obj.Izz(1) = (obj.xs-obj.xc)^2 * obj.t1*obj.h1;
-            obj.Izz(2) = (obj.xs-obj.xc+obj.d)^2 * obj.t2*obj.h2;
-            obj.Izz(3) = obj.a*obj.d^2*obj.t3/12 + (obj.xs + obj.d/2 - obj.xc)^2 * obj.t3*obj.a;
-            obj.IzzT = obj.Izz(1)+obj.Izz(2)+2*obj.Izz(3);
-            obj.J = 1/3*(obj.t2^3*obj.h2+obj.t1^3*obj.h1+2*obj.a*obj.t3^3);
+            Ixx = obj.computeInertiaX();
+            obj.IxxT = Ixx(1)+Ixx(2)+2*Ixx(3);
+
+            Izz = obj.computeInertiaZ();
+            obj.IzzT = Izz(1)+Izz(2)+2*Izz(3);
+
+            obj.J = obj.computeTorsionalInertia();
+            
+        end
+
+        function inertiaX = computeInertiaX(obj)
+            t1 = obj.thickness(1);
+            t2 = obj.thickness(2);
+            t3 = obj.thickness(3);
+            h1 = obj.height(1);
+            h2 = obj.height(2);
+            a  = obj.width;
+            d  = obj.airfolDist;
+            
+            inertiaX(1) = (t1*h1^3)/12;
+            inertiaX(2) = (t2*h2^3)/12;
+            inertiaX(3) = a^3*sind(4.76)^2*t3/12 + (h2/2+d/2*tand(4.76))^2*t3*a;
+        end
+
+        function inertiaZ = computeInertiaZ(obj)
+            t1 = obj.thickness(1);
+            t2 = obj.thickness(2);
+            t3 = obj.thickness(3);
+            h1 = obj.height(1);
+            h2 = obj.height(2);
+            a  = obj.width;
+            d  = obj.airfolDist;
+            xs = obj.xsDist;
+            xc = obj.xcDist;
+
+            inertiaZ(1) = (xs-xc)^2*t1*h1;
+            inertiaZ(2) = (xs-xc+d)^2*t2*h2;
+            inertiaZ(3) = a*d^2*t3/12 + (xs+d/2-xc)^2*t3*a;
+        end
+
+        function torsionalInertia = computeTorsionalInertia(obj)
+            t1 = obj.thickness(1);
+            t2 = obj.thickness(2);
+            t3 = obj.thickness(3);
+            h1 = obj.height(1);
+            h2 = obj.height(2);
+            a  = obj.width;
+
+            torsionalInertia = 1/3*(t2^3*h2+t1^3*h1+2*a*t3^3);
         end
 
     end

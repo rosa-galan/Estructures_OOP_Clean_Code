@@ -5,17 +5,14 @@ classdef ElementalForceComputer < handle
     end
 
     properties (Access = private)
-        dim
-        x
-        Tn
-        liftForceDist  
-        liftMomentDist
-        weightForceDist
-        weightMomentDist
-        gProp
-        xa
-        xc
-        xm
+        dimensions
+        xDist
+        nodalConnectivities
+        lift 
+        weight
+        xaDist
+        xcDist
+        xmDist
     end
 
     methods (Access = public)
@@ -33,41 +30,53 @@ classdef ElementalForceComputer < handle
     methods (Access = private)
 
         function init(obj,cParams)
-            obj.dim = cParams.dim;
-            obj.x = cParams.x;
-            obj.Tn = cParams.Tn;
-            obj.xa = cParams.xa;
-            obj.xc = cParams.xc;
-            obj.xm = cParams.xm;
-            obj.liftForceDist = cParams.liftForceDist;
-            obj.liftMomentDist = cParams.liftMomentDist;
-            obj.weightForceDist = cParams.weightForceDist;
-            obj.weightMomentDist = cParams.weightMomentDist;
-            obj.gProp = computeGeneralProperties(obj);
+            obj.dimensions          = cParams.dim;
+            obj.xDist               = cParams.x;
+            obj.nodalConnectivities = cParams.Tn;
+            obj.xaDist              = cParams.xa;
+            obj.xcDist              = cParams.xc;
+            obj.xmDist              = cParams.xm;
+            obj.lift                = cParams.liftForceDist;
+            obj.weight              = cParams.weightForceDist;
         end
 
         function computeElementalForce(obj)
-            obj.fel = zeros(obj.dim.ni*obj.dim.nne,obj.dim.nel);
-            for e=1:obj.dim.nel
-                obj.fel(:,e) = obj.gProp.bendingFel(:,e) + obj.gProp.torsionFel(:,e);
+            
+            elementalForces = computeForces(obj);
+            bendingFel = elementalForces.bending;
+            torsionFel = elementalForces.torsion;
+
+            dim = obj.dimensions;
+
+            obj.fel = zeros(dim.ni*dim.nne, dim.nel);
+            for e=1:dim.nel
+                obj.fel(:,e) = bendingFel(:,e) + torsionFel(:,e);
             end
         end
 
-        function s = computeGeneralProperties(obj)
+        function elemForces = computeForces(obj)
             syms y 
-            s.liftInt = int(obj.liftForceDist, y);
-            s.weightInt = int(obj.weightForceDist, y);
-            for e=1:obj.dim.nel
-                s.le = abs(obj.x(obj.Tn(e,2),1)- obj.x(obj.Tn(e,1),1))/1000;
-                s.intStart   = obj.x(obj.Tn(e,1),1)/1000;
-                s.intEnd     = obj.x(obj.Tn(e,2),1)/1000;
-                s.qe = double(subs(s.liftInt - s.weightInt, y, s.intEnd) - subs(s.liftInt - s.weightInt, y, s.intStart))/s.le;
-                s.mbe = 0;
-                s.msce = double(subs(s.liftInt, y, s.intEnd) - subs(s.liftInt, y, s.intStart))/s.le * (obj.xa-obj.xc)/1000 - ...
-                double(subs(s.weightInt, y, s.intEnd) - subs(s.weightInt, y, s.intStart))/s.le * (obj.xm-obj.xc)/1000;
-                s.bendingFel(:,e) = s.qe * s.le * [0.5; s.le/12; 0 ; 0.5; -s.le/12; 0] + ...
-                s.mbe * s.le * [0  ;    0.5; 0 ;   0;     0.5; 0];
-                s.torsionFel(:,e) = s.msce * s.le * [ 0; 0; 0.5; 0; 0; 0.5];
+            liftInt = int(obj.lift, y);
+            weightInt = int(obj.weight, y);
+            
+            dim = obj.dimensions;
+            x = obj.xDist;
+            Tn = obj.nodalConnectivities;
+            xa = obj.xaDist;
+            xc = obj.xcDist;
+            xm = obj.xmDist;
+            
+            for e=1:dim.nel
+                le = abs(x(Tn(e,2),1)- x(Tn(e,1),1))/1000;
+                intStart   = x(Tn(e,1),1)/1000;
+                intEnd     = x(Tn(e,2),1)/1000;
+                qe = double(subs(liftInt -weightInt, y, intEnd) - subs(liftInt - weightInt, y, intStart))/le;
+                mbe = 0;
+                msce = double(subs(liftInt, y, intEnd) - subs(liftInt, y, intStart))/le * (xa-xc)/1000 - ...
+                double(subs(weightInt, y, intEnd) - subs(weightInt, y, intStart))/le * (xm-xc)/1000;
+                
+                elemForces.bending(:,e) = qe*le*[0.5; le/12; 0; 0.5; -le/12; 0] + mbe*le*[0; 0.5; 0; 0; 0.5; 0];
+                elemForces.torsion(:,e) = msce*le*[0; 0; 0.5; 0; 0; 0.5];
             end
         end
 

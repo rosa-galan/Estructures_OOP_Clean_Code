@@ -16,7 +16,7 @@ classdef ConstantsComputer
         Cl
         lambda 
         g 
-        Me 
+        We 
         be
         E 
         G 
@@ -41,15 +41,11 @@ classdef ConstantsComputer
             obj.Cl = 0.1;
             obj.lambda = 150; 
             obj.g = 9.81; 
-            obj.Me = 2250; 
+            obj.We = 2250; 
             obj.E = 200e9; 
             obj.G = 75e9; 
             obj.Jo = 2.446e6*1e-12; 
             obj.Jc = 6.372e8*1e-12; 
-            obj = obj.computeDerivedProperties();
-        end
-        
-        function obj = computeDerivedProperties(obj)
             obj.h1 = 0.2 * obj.c;
             obj.h2 = 0.15 * obj.c;
             obj.xs = 0.3 * obj.c;
@@ -61,7 +57,7 @@ classdef ConstantsComputer
             obj.xe = 0.3 * obj.c;
             obj.xc = (obj.h1*obj.t1*obj.xs + obj.h2*obj.t2*(obj.d+obj.xs)+ 2*obj.t3*obj.a*(obj.xs+obj.d/2)) / (obj.h1*obj.t1 + obj.h2*obj.t2 + 2*obj.a*obj.t3);
         end
-
+       
     end
     
 end

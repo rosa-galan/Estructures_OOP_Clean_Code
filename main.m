@@ -1,252 +1,252 @@
-% Clean code main
+classdef main < handle
 
-function [s] =  main%(solverType) 
+    properties (Access = public)
+        internalForces
+        externalForces
+        deflexion
+        StiffnessMatrix
+        tanStress
+        normStress
+        displacement
+    end
 
-clear all
-close all
-clc
-%% 1. Take all constant data from the ConstantsComputer class
+    properties (Access = private)
+        problemData
+        beamData
+        forceZ
+        liftForce
+        liftMoment
+        weightMoment
+        weightForce
+        shearCenter
+        Ma
+        solverType
+    end
 
-data = ConstantsComputer();
+    methods (Access = public)
 
-data = data.computeDerivedProperties();
+        function obj = main(type)
+            obj.init(type);
+        end
 
-%% 2. Compute intertias
+        function compute(obj)
+            obj.computeIntermediateValues();
+            obj.computeStress();
+            obj.computeBeamData();
+            obj.solveBeam();
+        end
 
-% First, select the constants needed to compute the inertia
-s.t1 = data.t1;
-s.t2 = data.t2;
-s.t3 = data.t3;
-s.h1 = data.h1;
-s.h2 = data.h2;
-s.a = data.a;
-s.d = data.d;
-s.xc = data.xc;
-s.xs = data.xs;
-s.xe = data.xe;
-s.xm = data.xm;
-s.xa = data.xa;
+    end
+   
+    methods(Access = private)
 
-% Now call the class 
-Inertias = InertiaComputer(s);
-Inertias.compute();
+        function init(obj,type)
+            obj.problemData = ConstantsComputer();
+            obj.solverType = type;
+        end
 
-% Save to s the values of interest for future computations
-s.Ixx = Inertias.IxxT;
-s.Izz = Inertias.IzzT;
-s.J = Inertias.J;
+        function computeIntermediateValues(obj)
+            liftAndWeight    = computeLiftAndWeight(obj);
+            obj.liftForce    = liftAndWeight.liftForceDist;
+            obj.liftMoment   = liftAndWeight.liftMomentDist;
+            obj.weightForce  = liftAndWeight.weightForceDist;
+            obj.weightMoment = liftAndWeight.weightMomentDist;
 
-%% 3. Compute lift and weight forces and moments
+            Fz = computeVerticalForce(obj);
+            obj.forceZ = Fz.Sz;
 
-% First add the constants needed to compute 
-s.rho = data.rho;
-s.V = data.V;
-s.Cl = data.Cl;
-s.lambda = data.lambda;
-s.g = data.g;
-s.b = data.b;
-s.c = data.c;
-s.Me = data.Me;
+            fluxClosedSection = computeFluxClosedSection(obj);
+            obj.Ma = fluxClosedSection.Ma;
 
-% Call the class
-LiftWeight = LiftWeightComputer(s);
-LiftWeight.compute();
+            xsc = computeShearCenter(obj);
+            obj.shearCenter = xsc.shearCenter;
+        end
 
-% Save the values
-s.liftForceDist = LiftWeight.liftForceDist; 
-s.liftIntegral = LiftWeight.liftIntegral;
-s.liftMomentDist = LiftWeight.liftMomentDist;
-s.weightForceDist = LiftWeight.weightForceDist;
-s.weightMomentDist = LiftWeight.weightMomentDist;
+        function computeStress(obj)
+            cParams = obj.problemData;
+            s.be = cParams.be;
+            s.t1 = cParams.t1;
+            s.t2 = cParams.t2;
+            s.t3 = cParams.t3;
+            s.h1 = cParams.h1;
+            s.h2 = cParams.h2;
+            s.d  = cParams.d;
+            s.xs = cParams.xs;
+            s.xc = cParams.xc;
+            s.a  = cParams.a;
+            s.b  = cParams.b;
+            s.We = cParams.We;
+            s.g  = cParams.g;
+            s.Ma = obj.Ma;
+            s.liftMomentDist = obj.liftMoment;
+            s.weightMomentDist = obj.weightMoment;
+            s.Sz = obj.forceZ;
 
-%% 3. Compute z force Sz
+            stress = StressComputer(s);
+            stress.compute();
 
-% Call the class
-Sz = ForceZComputer(s);
-Sz.compute();
+            obj.tanStress = stress.tanStress;
+        end
 
-% Save the value for future computations
-s.Sz = Sz.Sz;
+        function computeBeamData(obj)
+            data = obj.problemData;
+            bData = BeamDataComputer(data);
+            bData.compute();
+            obj.beamData = bData;         
+        end
 
-%% 4. Compute flux in open section
+        function solveBeam(obj)
+            globalStiffMatrix = computeGlobalStiffMatrix(obj);
+            obj.StiffnessMatrix = globalStiffMatrix.KG;
+            
+            Fext = computeExternalForce(obj);
+            obj.externalForces = Fext.Fext;
 
-% Call the class
-FluxOpenSection = FluxComputer(s);
-FluxOpenSection.compute();
+            displ = computeDisplacements(obj);
+            obj.displacement = displ.u;
 
-% Save values of flux to s
-s.q = FluxOpenSection.q;
-s.qSection = FluxOpenSection.qSection;
+            Fint = computeInternalForce(obj);
+            obj.internalForces = Fint;
 
-%% 5. Compute shear center
+            defl = computeDeflexion(obj);
+            obj.deflexion = defl;    
+        end
 
-% Call the class
-shearCenter = ShearCenterComputer(s);
-shearCenter.compute();
+        function forces = computeLiftAndWeight(obj)
+            cParams     = obj.problemData;
+            s.rho    = cParams.rho;
+            s.V      = cParams.V;
+            s.Cl     = cParams.Cl;
+            s.lambda = cParams.lambda;
+            s.g      = cParams.g;
+            s.b      = cParams.b;
+            s.c      = cParams.c;
 
-% Save the value
-s.xsc = shearCenter.shearCenter;
+            forces = LiftWeightComputer(s);
+            forces.compute();
+        end
 
+        function forceZ = computeVerticalForce(obj)
+            cParams     = obj.problemData;
+            s.g      = cParams.g;
+            s.b      = cParams.b;
+            s.c      = cParams.c;
+            s.We     = cParams.We;
+            s.rho    = cParams.rho;
+            s.V      = cParams.V;
+            s.Cl     = cParams.Cl;
+            s.lambda = cParams.lambda;
 
-%% 6. Compute flux in closed section
+            forceZ = ForceZComputer(s);
+            forceZ.compute();
+        end
 
-% Save necessary values from data
-s.be = data.be;
+        function fluxClosedSection = computeFluxClosedSection(obj)
+            cParams = obj.problemData;
+            s.Sz = obj.forceZ;
+            s.be = cParams.be;
+            s.t1 = cParams.t1;
+            s.t2 = cParams.t2;
+            s.t3 = cParams.t3;
+            s.h1 = cParams.h1;
+            s.h2 = cParams.h2;
+            s.d  = cParams.d;
+            s.xs = cParams.xs;
+            s.xc = cParams.xc;
+            s.a  = cParams.a;
 
-% Call the class
-FluxClosedSection = ClosedSectionFluxComputer(s);
-FluxClosedSection.compute();
+            fluxClosedSection = ClosedSectionFluxComputer(s);
+            fluxClosedSection.compute();
+        end
 
-% Save necessary values
+        function shearCenter = computeShearCenter(obj)
+            cParams = obj.problemData;
+            s.Sz = obj.forceZ;
+            s.t1 = cParams.t1;
+            s.t2 = cParams.t2;
+            s.t3 = cParams.t3;
+            s.h1 = cParams.h1;
+            s.h2 = cParams.h2;
+            s.d  = cParams.d;
+            s.xs = cParams.xs;
+            s.xc = cParams.xc;
+            s.a  = cParams.a;
 
-s.Ma = FluxClosedSection.Ma;
+            shearCenter = ShearCenterComputer(s);
+            shearCenter.compute();
+        end
 
-%% 7. Compute moment in the shear center
+        function globalStiffMatrix = computeGlobalStiffMatrix(obj)
+            cParams   = obj.beamData;
+            s.x       = cParams.x;
+            s.Tm      = cParams.Tm;
+            s.matProp = cParams.materialProperties;
+            s.Tn      = cParams.Tn;
+            s.dim     = cParams.dim;
 
-% 7.1 Open section case 
-OpenMoment = OpenSectionMomentComputer(s);
-OpenMoment.compute();
-s.openMsc = OpenMoment.openMsc;
+            globalStiffMatrix = GlobalStiffnessMatrixComputer(s);
+            globalStiffMatrix.compute();
+        end
 
-% 7.2. Closed section case
-ClosedMoment = ClosedSectionMomentComputer(s);
-ClosedMoment.compute();
-s.closedMsc = ClosedMoment.closedMsc;
+        function Fext = computeExternalForce(obj)
+            cParams           = obj.beamData;
+            data              = obj.problemData;
+            s.dim             = cParams.dim;
+            s.x               = cParams.x;
+            s.Tn              = cParams.Tn;
+            s.fdata           = cParams.fData;
+            s.xa              = data.xa;
+            s.xc              = data.xc;
+            s.xm              = data.xm;
+            s.liftForceDist   = obj.liftForce;
+            s.weightForceDist = obj.weightForce;
 
+            Fext = GlobalExternalForceComputer(s);
+            Fext.compute();
+        end
 
-%% 8. Compute tangential and normal stress
+        function u = computeDisplacements(obj)
+            cParams           = obj.beamData;
+            data              = obj.problemData;
+            s.dim             = cParams.dim;
+            s.x               = cParams.x;
+            s.Tn              = cParams.Tn;
+            s.Tm              = cParams.Tm;
+            s.matProp         = cParams.materialProperties;
+            s.fdata           = cParams.fData;
+            s.xa              = data.xa;
+            s.xc              = data.xc;
+            s.xm              = data.xm;
+            s.type            = obj.solverType;
+            s.liftForceDist   = obj.liftForce;
+            s.weightForceDist = obj.weightForce;
+            s.fixNodes        = cParams.fixNodes;
 
-% Call the class 
-TanNormStress = StressComputer(s);
-TanNormStress.compute();
+            u = SystemSolver(s);
+            u.compute();
+        end
 
-%% 9. Take all the constant data from the beamDataComputer class
+        function Fint = computeInternalForce(obj)
+            cParams   = obj.beamData;
+            s.dim     = cParams.dim;
+            s.x       = cParams.x;
+            s.Tn      = cParams.Tn;
+            s.Tm      = cParams.Tm;
+            s.matProp = cParams.materialProperties;
+            s.u       = obj.displacement;
 
-% Add the necessary parameters 
-s.Jc = data.Jc;
-s.G = data.G;
-s.E = data.E;
+            Fint = InternalForcesComputer(s);
+            Fint.compute();
+        end
 
-% Call the class
-beamData = BeamDataComputer(s);
+        function defl = computeDeflexion(obj)
+            cParams = obj.beamData;
+            s.Nel   = cParams.nElements;
 
-% Save necessary values
-s.Tn = beamData.Tn;
-s.Tm = beamData.Tm;
-s.dim = beamData.dim;
-s.x = beamData.x;
-s.matProp = beamData.materialProperties;
-s.Tm = beamData.Tm;
-s.fdata = beamData.fData;
-s.fixNodes = beamData.fixNodes;
-s.Nel = beamData.Nel;
+            defl = DeflexionComputer(s);
+            defl.compute();
+        end
 
-%% 10. Beam solver
-
-% 10.1. Create degrees of freedom connectivities matrix
-ConnectMatrix = ConnectDOFComputer(s);
-ConnectMatrix.compute();
-s.Td = ConnectMatrix.Td;
-
-% 10.2. Compute element stiffness matrices
-StiffnessElementalMatrix = ElementalStiffnessMatrixComputer(s);
-StiffnessElementalMatrix.compute();
-s.Kel = StiffnessElementalMatrix.Kel;
-
-% 10.3. Assemble global stiffness matrix
-KG = GlobalStiffnessMatrixComputer(s);
-KG.compute();
-s.KG = KG.KG;
-
-% 10.4. Compute element force vector
-ElementalForce = ElementalForceComputer(s);
-ElementalForce.compute();
-s.fel = ElementalForce.fel;
-
-% 10.5. Assemble global external forces vector
-GlobalFext = GlobalExternalForceComputer(s);
-GlobalFext.compute();
-s.Fext = GlobalFext.Fext;
-
-% 10.6. Create arrays of fixed and free degrees of freedom
-fixDOF = FixedDOFComputer(s);
-fixDOF.compute();
-s.ur = fixDOF.ur;
-s.vr = fixDOF.vr;
-s.vf = fixDOF.vf;
-
-%save('ParametersData.mat','s');
-
-% 10.7. Solve system and obtain reactions and displacements
-
-SystemSolution = SystemSolver(s);
-SystemSolution.compute();
-s.u = SystemSolution.u;
-s.R = SystemSolution.R;
-
-% 10.8. Compute internal forces distribution
-internalForces = InternalForcesComputer(s);
-internalForces.compute();
-s.Q = internalForces.Q;
-s.Mb = internalForces.Mb;
-s.Mt = internalForces.Mt;
-
-% 10.9 Deflexion angles
-deflexion = DeflexionComputer(s);
-deflexion.compute();
-s.defX = deflexion.defX;
-s.defY = deflexion.defY;
-s.defTheta = deflexion.defTheta;
-
-
-%% 11. Postprocess
-
-% 11.1 Distribution plots
-
-% Force and moment plots
-figure(1);
-subplot(3, 1, 1);
-plot(s.x(s.Tn'),s.Q','color','r');
-title("Shear force distribution (Q)");
-xlabel('Position along the beam (mm)');
-ylabel('Shear force (N)');
-subplot(3, 1, 2);
-plot(s.x(s.Tn'),s.Mb','color','g');
-title("Bending moment distribution");
-xlabel('Position along the beam (mm)');
-ylabel('Bending moment (Nm)');
-subplot(3, 1, 3);
-plot(s.x(s.Tn'),s.Mt','color','b');
-title("Torsion moment distribution")
-xlabel('Position along the beam (mm)');
-ylabel('Torsion moment (Nm)');
-
-% Deflexion plots
-figure(2);
-subplot(3, 1, 1);
-plot(s.x(1:s.Nel),s.u(s.defX,1),'color','b');
-title("Vertical deflexion distribution");
-xlabel('Position along the beam (mm)');
-ylabel('Vertical deflexion (m)');
-subplot(3, 1, 2);
-plot(s.x(1:s.Nel),s.u(s.defY,1),'color','b');
-title("Deflexion angle distribution - Bending");
-xlabel('Position along the beam (mm)');
-ylabel('Deflexion angle (º)');
-subplot(3, 1, 3);
-plot(s.x(1:s.Nel),s.u(s.defTheta,1),'color','b');
-title("Deflexion angle distribution - Torsion");
-xlabel('Position along the beam (mm)');
-ylabel('Deflexion angle (º)');
-
-
-% 11.2. Colormaps
-
-% Open case
-%sectionAnalysis('open',s.d/1000,s.h1/1000,s.h2/1000,s.t1/1000,s.t2/1000,s.t3/1000,s.E,s.G,-s.xsc/1000 + (s.xc-(s.xs+s.d/2))/1000,double(s.Sz),s.Mb(1),double(s.openMsc));
-
-% Closed case
-%sectionAnalysis('closed',s.d/1000,s.h1/1000,s.h2/1000,s.t1/1000,s.t2/1000,s.t3/1000,s.E,s.G,-(s.xc-(s.xs+s.d/2))/1000,double(s.Sz),-s.Mb(1),double(s.closedMsc));
-
+    end
 
 end

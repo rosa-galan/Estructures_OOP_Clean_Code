@@ -7,11 +7,12 @@ classdef InternalForcesComputer < handle
     end
 
     properties (Access = private)
-        dim
-        Td
-        Kel
-        u
-        feInt
+        dimensions
+        nodalConnectivities
+        displacement
+        xDist
+        matConnectivities
+        matProp
     end
 
     methods (Access = public)
@@ -29,25 +30,59 @@ classdef InternalForcesComputer < handle
     methods (Access = private)
 
         function init(obj,cParams)
-            obj.dim = cParams.dim;
-            obj.Td = cParams.Td;
-            obj.Kel = cParams.Kel;
-            obj.u = cParams.u;
+            obj.xDist               = cParams.x;
+            obj.matConnectivities   = cParams.Tm;
+            obj.matProp             = cParams.matProp;
+            obj.nodalConnectivities = cParams.Tn;
+            obj.dimensions          = cParams.dim;
+            obj.displacement        = cParams.u;
         end
 
         function computeInternalForces(obj)
-            obj.Q = zeros(obj.dim.nel,2);
-            obj.Mb = zeros(obj.dim.nel,2);
-            obj.Mt = zeros(obj.dim.nel,2);
-            for e=1:obj.dim.nel
-                obj.feInt = obj.Kel(:,:,e) * obj.u(obj.Td(e,:));
-                obj.Q(e,1)  = -obj.feInt(1);
-                obj.Mb(e,1) = -obj.feInt(2);
-                obj.Mt(e,1) = -obj.feInt(3);
-                obj.Q(e,2)  =  obj.feInt(4);
-                obj.Mb(e,2) =  obj.feInt(5);
-                obj.Mt(e,2) =  obj.feInt(6);
+
+            connectDOF = computeDOFConnectivities(obj);
+            Td = connectDOF.Td;
+
+            elementalMatrix = computeElementalMatrix(obj);
+            Kel = elementalMatrix.Kel;
+
+            dim = obj.dimensions;
+            u = obj.displacement;
+
+            obj.Q = zeros(dim.nel,2);
+            obj.Mb = zeros(dim.nel,2);
+            obj.Mt = zeros(dim.nel,2);
+
+            for e=1:dim.nel
+                feInt = Kel(:,:,e)*u(Td(e,:));
+                obj.Q(e,1)  = -feInt(1);
+                obj.Mb(e,1) = -feInt(2);
+                obj.Mt(e,1) = -feInt(3);
+                obj.Q(e,2)  =  feInt(4);
+                obj.Mb(e,2) =  feInt(5);
+                obj.Mt(e,2) =  feInt(6);
             end
+        end
+
+        function elementalMatrix = computeElementalMatrix(obj)
+
+            s.x = obj.xDist;
+            s.dim = obj.dimensions;
+            s.Tn = obj.nodalConnectivities;
+            s.matProp = obj.matProp;
+            s.Tm = obj.matConnectivities;
+
+            elementalMatrix = ElementalStiffnessMatrixComputer(s);
+            elementalMatrix.compute();
+        end
+
+        function connectDOF = computeDOFConnectivities(obj)
+
+            s.dim = obj.dimensions;
+            s.Tn = obj.nodalConnectivities;
+
+            connectDOF = ConnectDOFComputer(s);
+            connectDOF.compute();
         end
 
     end  

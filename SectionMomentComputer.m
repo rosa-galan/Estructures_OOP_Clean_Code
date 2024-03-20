@@ -1,7 +1,8 @@
-classdef OpenSectionMomentComputer < handle
+classdef SectionMomentComputer < handle
     
     properties (Access = public)
         openMsc 
+        closedMsc
     end
 
     properties (Access = private)
@@ -19,7 +20,7 @@ classdef OpenSectionMomentComputer < handle
 
     methods (Access = public)
         
-        function obj = OpenSectionMomentComputer(cParams)
+        function obj = SectionMomentComputer(cParams)
             obj.init(cParams);
         end
 
@@ -49,7 +50,8 @@ classdef OpenSectionMomentComputer < handle
             liftMoment   = computeLiftMoment(obj);
             weightMoment = computeWeightMoment(obj);
 
-            obj.openMsc = engineMoment + liftMoment + weightMoment;
+            obj.openMsc = engineMoment(1) + liftMoment(1) + weightMoment(1);
+            obj.closedMsc = engineMoment(2) + liftMoment(2) + weightMoment(2);
         end
 
         function s = computeEngineMoment(obj)
@@ -59,7 +61,8 @@ classdef OpenSectionMomentComputer < handle
             xe  = obj.xeDist;
             xc  = obj.xcDist;
 
-            s = Me*g*(xsc/1000-(xe/1000-xc/1000));
+            s(1) = Me*g*(xsc/1000-(xe/1000-xc/1000));
+            s(2) = Me*g*(xc/1000-(xe/1000-xc/1000));
         end
 
         function s = computeLiftMoment(obj)
@@ -69,7 +72,9 @@ classdef OpenSectionMomentComputer < handle
             b   = obj.span;
             L   = obj.lift;
 
-            s = int(L, [0 b/1000])*(xsc/1000-(xc/1000-xa/1000));
+            s(1) = int(L, [0 b/1000])*(xsc/1000-(xc/1000-xa/1000));
+            s(2) = int(L, [0 b/1000])*(xc/1000-(xc/1000-xa/1000));
+
         end
 
         function s = computeWeightMoment(obj)
@@ -78,7 +83,8 @@ classdef OpenSectionMomentComputer < handle
             xc  = obj.xcDist;
             W  = obj.weight;
 
-            s = W*16*(xsc/1000-(xm/1000-xc/1000));
+            s(1) = W*16*(xsc/1000-(xm/1000-xc/1000));
+            s(2) = W*16*(xc/1000-(xm/1000-xc/1000));
         end
         
     end

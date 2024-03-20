@@ -11,13 +11,12 @@ classdef Solver < handle
 
     methods (Access = public, Static)
 
-        function obj = create(L,R)
-            type = input('Enter a number - 1 [Iterative Solver] or 2 [Direct Solver]: ');
+        function obj = create(L,R,type)
             switch type
-                 case 1
+                case 'Iterative'
                     obj = IterativeSolver(L,R);
                     obj.computeDisplacement();
-                 case 2
+                case 'Direct'
                     obj = DirectSolver(L,R);
                     obj.computeDisplacement();
                 otherwise
